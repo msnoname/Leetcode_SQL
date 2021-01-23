@@ -15,7 +15,6 @@ order by Department, Salary desc
 # 比如示例中，IT部门的Will工资70000，同部门Max工资90000，Joe和Randy工资85000，那么对Will来说，同部门内，就有2个比他更高的工资级别，count函数返回2
 # 之后，查询count<=2的人，因为“排前3名”也可以表述为：超过自己的工资级别不超过2个
 # 这种方法的逻辑不难，但语法比较难绕，因为e1表既要参与外层查询，和Department表连接，又要参与子查询，和e2表连接
-# 此外，此方法相比上种方法多用了一个e2表，耗时较长，可能是需要Employee表自连接的缘故？
 
 select Department.Name 'Department', e1.Name 'Employee', Salary
 from Employee e1, Department
