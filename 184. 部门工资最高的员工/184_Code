@@ -1,0 +1,22 @@
+# 窗口函数
+# 本题用rank()或dense_rank()都可以，但如果问题变成“工资前三高”，就要用dense_rank()
+
+select Department, Employee, Salary
+from (
+    select Employee.Name 'Employee', Salary, Department.Name 'Department', rank() over(partition by Department.Name order by Salary desc) as 'rank'
+    from Employee, Department
+    where Employee.DepartmentId = Department.Id
+) tmp
+where tmp.rank = 1
+
+# in语句
+# 先找出每个部门中最高的收入，然后在Department和Employee的联合表中找到符合该收入的人
+
+select Department.Name Department, Employee.Name Employee, Salary
+from Department, Employee
+where DepartmentId = Department.Id 
+and (DepartmentId, Salary) in (
+    select DepartmentId, max(Salary) MaxSalary
+    from Employee
+    group by DepartmentId
+)
