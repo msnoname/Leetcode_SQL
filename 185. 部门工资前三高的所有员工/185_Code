@@ -1,0 +1,26 @@
+# dense_rank()
+# 先统计每个人在部门内自己工资级别的排名，然后查出排名在前三位的人
+# 注意不要漏掉表的连接条件和desc倒序，最后order by可省
+
+select Department.Name 'Department', tmp.Name 'Employee', Salary
+from (
+    select Name, Salary, DepartmentId, dense_rank() over (partition by DepartmentId order by Salary desc) 'Rank'
+    from Employee
+) tmp, Department
+where tmp.Rank <= 3 and DepartmentId = Department.Id
+order by Department, Salary desc
+
+# count()
+# 思路是先统计同部门内，比每个人高的工资级别数（注意要用distinct，count的是工资而不是人）
+# 比如示例中，IT部门的Will工资70000，同部门Max工资90000，Joe和Randy工资85000，那么对Will来说，同部门内，就有2个比他更高的工资级别，count函数返回2
+# 之后，查询count<=2的人，因为“排前3名”也可以表述为：超过自己的工资级别不超过2个
+# 这种方法的逻辑不难，但语法比较难绕，因为e1表既要参与外层查询，和Department表连接，又要参与子查询，和e2表连接
+# 此外，此方法相比上种方法多用了一个e2表，耗时较长，可能是需要Employee表自连接的缘故？
+
+select Department.Name 'Department', e1.Name 'Employee', Salary
+from Employee e1, Department
+where 3 > (
+    select count(distinct e2.Salary)
+    from Employee e2
+    where e1.DepartmentId = e2.DepartmentId and e1.Salary < e2.Salary
+) and e1.DepartmentId = Department.Id
