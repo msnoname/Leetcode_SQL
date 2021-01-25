@@ -1,0 +1,97 @@
+# 有条件计数：sum(if(T.Status = 'completed', 0, 1))
+# 保留2位小数：round(~, 2)
+# 选择某时间段内的数据：where T.Request_at between '2013-10-01' and '2013-10-03'
+# 注意最后需要按日期分组统计
+
+
+
+# 方法一
+
+# 先选出未被禁的Client和Driver，再使用自然连接+子查询方法和Trips表连接
+
+select T.Request_at 'Day', round(sum(if(T.Status = 'completed', 0, 1)) / count(T.Status), 2) 'Cancellation Rate'
+from Trips T, (
+    select Users_Id
+    from Users
+    where Banned = 'No'
+) Clients, (
+    select Users_Id
+    from Users
+    where Banned = 'No'
+) Drivers
+where T.Client_Id = Clients.Users_Id and T.Driver_Id = Drivers.Users_Id and T.Request_at between '2013-10-01' and '2013-10-03'
+group by T.Request_at
+
+# 或也可以用join连接
+
+select T.Request_at 'Day', round(sum(if(T.Status = 'completed', 0, 1)) / count(T.Status), 2) 'Cancellation Rate'
+from Trips T
+join Users Clients on (
+    T.Client_Id = Clients.Users_Id
+    and Clients.Banned = 'No'
+) join Users Drivers on (
+    T.Client_Id = Drivers.Users_Id
+    and Drivers.Banned = 'No'
+)
+where T.Request_at between '2013-10-01' and '2013-10-03'
+group by T.Request_at
+
+# 一种错误的找出没被禁止用户行程记录的方法
+
+select *
+from Trips T join Users U on (T.Client_id = U.Users_id or T.Driver_id = U.Users_id) and U.Banned ='No'
+
+# 这里的or是满足其一即可，所以如果一条行车记录的Client和Driver其中有一个人被禁，另一个没被禁，那么这条本不该被选出的记录也会被选出
+# 正确的做法是对 Client_id 和 Driver_id 各自关联的 Users_id，同时检测是否被禁止
+
+
+
+# 方法二
+
+# 反向思考，先选出被禁的Client和Driver，然后left join，这样Client和Driver的 User_Id 都为空的行即为Client和Driver都没有被禁止的行，即为所求
+
+select T.Request_at 'Day', round(sum(if(T.Status = 'completed', 0, 1)) / count(T.Status), 2) 'Cancellation Rate'
+from Trips T left join (
+    select Users_Id
+    from Users
+    where Banned = 'Yes'
+) Clients on (T.Client_Id = Clients.Users_Id) left join (
+    select Users_Id
+    from Users
+    where Banned = 'Yes'
+) Drivers on (T.Client_Id = Drivers.Users_Id)
+where Clients.Users_Id is NULL and Drivers.Users_Id is NULL and T.Request_at between '2013-10-01' and '2013-10-03'
+group by T.Request_at
+
+# 或者用not in直接连接
+
+select T.Request_at 'Day', round(sum(if(T.Status = 'completed', 0, 1)) / count(T.Status), 2) 'Cancellation Rate'
+from Trips T
+where T.Client_Id not in (
+    select Users_Id
+    from Users
+    where Banned = 'Yes'
+) and T.Driver_Id not in (
+    select Users_Id
+    from Users
+    where Banned = 'Yes'
+) and T.Request_at between '2013-10-01' and '2013-10-03'
+group by T.Request_at
+
+# 一种错误的排除被禁止用户的方法
+
+select *
+from Trips T,
+(
+	select Users_id
+	from Users
+	where Banned = 'Yes'
+) A
+where (T.Client_Id != A.Users_id and T.Driver_Id != A.Users_id)
+
+# 当表A为空时，此方法的结果是空表。但是表A为空，可能是有用户但是没有被禁止的用户。因此方法是错误的。
+# 因为用name != 'xxx'的方式取不出NULL值
+# 正确的解法是：行程表left join表A两次，A.Users_id都为NULL的行都是没被排除的行。
+# Mysql中空值和NULL的对比见：https://blog.csdn.net/huo_shaonan/article/details/52066948
+
+
