@@ -1,0 +1,20 @@
+# 开窗求差值
+# 首先过滤出people>=100的字段
+# 开窗，用id减去row_number，并根据主键visit_date排序，若id连续，那么差值一定相同
+# where过滤出条数>=3的完成解题
+
+# 注意：使用with语句是因为tmp表用于where的子查询语句，相当于先建立了一个临时表
+
+with tmp as (
+    select *, id - row_number() over (order by visit_date asc) 'ranking'
+    from Stadium
+    where people >= 100 
+)
+select id, visit_date, people
+from tmp
+where ranking in (
+    select ranking
+    from tmp
+    group by ranking
+    having count(ranking) >= 3
+)
